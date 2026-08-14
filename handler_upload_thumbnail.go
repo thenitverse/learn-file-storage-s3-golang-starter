@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -53,6 +54,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 
 	}
+	str := base64.StdEncoding.EncodeToString(imageData)
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mediatype, str) // it will be something like data:image/png;base64,iVBORW0KGgoAAAAn...
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Unable to get a video", err)
@@ -62,13 +65,9 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "Unable to find user with this id ", nil)
 		return
 	}
-	videoThumbnails[videoID] = thumbnail{
-		data:      imageData,
-		mediaType: mediatype,
-	}
-	thumbnailURL := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoID)
-	video.ThumbnailURL = &thumbnailURL
-	err = cfg.db.UpdateVideo(video)
+
+	video.ThumbnailURL = &dataURL
+	err = cfg.db.UpdateVideo(video) //saved the dataurl string as a video.thumbnailurl in data base
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Unable to get URL", err)
 		return
