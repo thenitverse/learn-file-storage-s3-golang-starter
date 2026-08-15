@@ -1,11 +1,13 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -48,14 +50,14 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "Unable to parse mediaType", err)
 		return
 	}
-	imageData, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to fetch image data", err)
-		return
 
-	}
-	str := base64.StdEncoding.EncodeToString(imageData)
-	dataURL := fmt.Sprintf("data:%s;base64,%s", mediatype, str) // it will be something like data:image/png;base64,iVBORW0KGgoAAAAn...
+	// Suppose mediatype is "image/png"
+	parts := strings.Split(mediatype, "/")
+	// parts becomes []string{"image", "png"}
+
+	// The second element (parts[1]) is the extension name: "png"
+	ext := "." + parts[1]
+	// ext becomes ".png"
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Unable to get a video", err)
@@ -65,8 +67,24 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "Unable to find user with this id ", nil)
 		return
 	}
+	fileName := fmt.Sprintf("%s%s", videoID, ext)
+	filePath := filepath.Join(cfg.assetsRoot, fileName)
+	dst, err := os.Create(filePath)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to find file ", err)
+		return
+		// handle error
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to copy file", err)
+		return
+	}
+	url := fmt.Sprintf("http://localhost:%s/assets/%s", cfg.port, fileName)
+	video.ThumbnailURL = &url
+	// it will be something like data:image/png;base64,iVBORW0KGgoAAAAn...
 
-	video.ThumbnailURL = &dataURL
 	err = cfg.db.UpdateVideo(video) //saved the dataurl string as a video.thumbnailurl in data base
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Unable to get URL", err)
