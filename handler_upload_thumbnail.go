@@ -37,7 +37,11 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	// TODO: implement the upload here
 	const maxMemory = 10 << 20
-	r.ParseMultipartForm(maxMemory)
+	err = r.ParseMultipartForm(maxMemory)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to parse multipart form", err)
+		return
+	}
 	file, header, err := r.FormFile("thumbnail")
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Unable to parse form file", err)
@@ -48,6 +52,10 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	mediatype, _, err := mime.ParseMediaType(value)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Unable to parse mediaType", err)
+		return
+	}
+	if mediatype != "image/jpeg" && mediatype != "image/png" {
+		respondWithError(w, http.StatusBadRequest, "not a correct media type", nil)
 		return
 	}
 
